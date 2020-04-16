@@ -23,11 +23,11 @@ namespace DotNetCoreReactAdmin.Controllers
             _context = context;
         }
 
-        [HttpDelete("{id}")]
-        public async Task<ActionResult<T>> Delete(long id)
+        [HttpDelete("{uid}")]
+        public async Task<ActionResult<T>> Delete(long uid)
         {
             Console.WriteLine("[Delete]");
-            var entity = await _table.FindAsync(id);
+            var entity = await _table.FindAsync(uid);
             if (entity == null)
             {
                 return NotFound();
@@ -94,11 +94,11 @@ namespace DotNetCoreReactAdmin.Controllers
             return await entityQuery.ToListAsync();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<T>> Get(long id)
+        [HttpGet("{uid}")]
+        public async Task<ActionResult<T>> Get(long uid)
         {
-            Console.WriteLine("[Get] id");
-            var entity = await _table.FindAsync(id);
+            Console.WriteLine("[Get] uid");
+            var entity = await _table.FindAsync(uid);
 
             if (entity == null)
             {
@@ -118,20 +118,20 @@ namespace DotNetCoreReactAdmin.Controllers
             Console.WriteLine("[Post]");
             _table.Add(entity);
             await _context.SaveChangesAsync();
-            var id = (int)typeof(T).GetProperty("Id").GetValue(entity);
+            var uid = (int)typeof(T).GetProperty("Id").GetValue(entity);
             Response.Headers.Add("Access-Control-Allow-Credentials", "true");
             Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type,Authorization");
             Response.Headers.Add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
             Response.Headers.Add("Access-Control-Allow-Origin", "*");
-            return Ok(await _table.FindAsync(id));
+            return Ok(await _table.FindAsync(uid));
         }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Put(long id, T entity)
+        [HttpPut("{uid}")]
+        public async Task<IActionResult> Put(long uid, T entity)
         {
             Console.WriteLine("[Put]");
             var entityId = (int)typeof(T).GetProperty("Id").GetValue(entity);
-            if (id != entityId)
+            if (uid != entityId)
             {
                 return BadRequest();
             }
@@ -144,7 +144,7 @@ namespace DotNetCoreReactAdmin.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!EntityExists(id))
+                if (!EntityExists(uid))
                 {
                     return NotFound();
                 }
@@ -161,9 +161,9 @@ namespace DotNetCoreReactAdmin.Controllers
             return Ok(await _table.FindAsync(entityId));
         }
 
-        private bool EntityExists(long id)
+        private bool EntityExists(long uid)
         {
-            return _table.Any(e => (int)typeof(T).GetProperty("Id").GetValue(e) == id);
+            return _table.Any(e => (int)typeof(T).GetProperty("Id").GetValue(e) == uid);
         }
 
     }
