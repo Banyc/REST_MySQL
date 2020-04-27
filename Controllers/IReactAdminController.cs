@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-// <https://github.com/tYoshiyuki/dotnet-core-react-admin/blob/master/DotNetCoreReactAdmin/Controllers/IReactAdminController.cs>
+// Credit to <https://github.com/tYoshiyuki/dotnet-core-react-admin/blob/master/DotNetCoreReactAdmin/Controllers/IReactAdminController.cs>
 
 namespace DotNetCoreReactAdmin.Controllers
 {

@@ -24,3 +24,7 @@ updateMany	Multiple calls to PUT http://my.api.url/posts/123
 delete	DELETE http://my.api.url/posts/123
 deteleMany	Multiple calls to DELETE http://my.api.url/posts/123
 ```
+
+## Credit
+
+- tYoshiyuki's [dotnet-core-react-admin](https://github.com/tYoshiyuki/dotnet-core-react-admin)
