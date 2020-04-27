@@ -29,7 +29,7 @@ namespace REST_MySQL
         {
             services.AddDbContext<PersonContext>(opt =>
                 // opt.UseInMemoryDatabase("PeopleList"));
-                opt.UseMySQL("server=localhost;database=personaluserinfo;user=libadmin;password=123321"));
+                opt.UseMySQL(Secrets.MySQLConn));
             services.AddControllers();
         }
 
