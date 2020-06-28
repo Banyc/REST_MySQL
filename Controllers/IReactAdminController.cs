@@ -11,9 +11,9 @@ namespace DotNetCoreReactAdmin.Controllers
     public interface IReactAdminController<T>
     {
         Task<ActionResult<IEnumerable<T>>> Get(string filter = "", string range = "", string sort = "");
-        Task<ActionResult<T>> Get(long id);
-        Task<IActionResult> Put(long id, T entity);
+        Task<ActionResult<T>> Get(string id);
+        Task<IActionResult> Put(string id, T entity);
         Task<ActionResult<T>> Post(T entity);
-        Task<ActionResult<T>> Delete(long id);
+        Task<ActionResult<T>> Delete(string id);
     }
 }

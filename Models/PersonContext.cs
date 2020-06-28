@@ -17,7 +17,7 @@ namespace REST_MySQL.Models
 
             modelBuilder.Entity<Person>(entity =>
             {
-                entity.HasKey(e => e.Uid);
+                // entity.HasKey(e => e.Uid);
                 // entity.Property(e => e.Title).IsRequired();
             });
         }

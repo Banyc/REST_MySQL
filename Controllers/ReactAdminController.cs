@@ -5,8 +5,11 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DotNetCoreReactAdmin.Controllers
@@ -17,17 +20,38 @@ namespace DotNetCoreReactAdmin.Controllers
     {
         protected readonly DbContext _context;
         protected DbSet<T> _table;
+        protected PropertyInfo FirstKeyProperty
+        {
+            get 
+            {
+                return GetFirstKey();
+            }
+        }
+        protected string FirstKeyName
+        {
+            get
+            {
+                return GetFirstKey().Name;
+            }
+        }
+        protected Type FirstKeyType
+        {
+            get
+            {
+                return GetFirstKey().PropertyType;
+            }
+        }
 
         public ReactAdminController(DbContext context)
         {
             _context = context;
         }
 
-        [HttpDelete("{uid}")]
-        public async Task<ActionResult<T>> Delete(long uid)
+        [HttpDelete("{id}")]
+        public async Task<ActionResult<T>> Delete(string id)
         {
             Console.WriteLine("[Delete]");
-            var entity = await _table.FindAsync(uid);
+            var entity = await _table.FindAsync(CastPropertyValue(this.FirstKeyProperty, id));
             if (entity == null)
             {
                 return NotFound();
@@ -51,17 +75,26 @@ namespace DotNetCoreReactAdmin.Controllers
 
             if (!string.IsNullOrEmpty(filter))
             {
-                var filterVal = (JObject)JsonConvert.DeserializeObject(filter);
-                var t = new T();
-                foreach (var f in filterVal)
+                if (Regex.IsMatch(filter, @"^{\S+?\s*?:\s*?\[.*?\]\s*?}$"))
                 {
-                    if (t.GetType().GetProperty(f.Key).PropertyType == typeof(string))
+                    var filterVal = (JObject)JsonConvert.DeserializeObject<IEnumerable<string>>(filter);
+                    // Type := getMany
+                    // TODO
+                }
+                else
+                {
+                    // Type := getList || getManyReference
+                    var filterVal = (JObject)JsonConvert.DeserializeObject(filter);
+                    foreach (var f in filterVal)
                     {
-                        entityQuery = entityQuery.Where($"{f.Key}.Contains(@0)", f.Value.ToString());
-                    }
-                    else
-                    {
-                        entityQuery = entityQuery.Where($"{f.Key} == @0", f.Value.ToString());
+                        if (typeof(T).GetProperty(f.Key, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance)?.PropertyType == typeof(string))
+                        {
+                            entityQuery = entityQuery.Where($"{f.Key}.Contains(@0)", f.Value.ToString());
+                        }
+                        else
+                        {
+                            entityQuery = entityQuery.Where($"{f.Key} == @0", f.Value.ToString());
+                        }
                     }
                 }
             }
@@ -94,11 +127,11 @@ namespace DotNetCoreReactAdmin.Controllers
             return await entityQuery.ToListAsync();
         }
 
-        [HttpGet("{uid}")]
-        public async Task<ActionResult<T>> Get(long uid)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<T>> Get(string id)
         {
-            Console.WriteLine("[Get] uid");
-            var entity = await _table.FindAsync(uid);
+            Console.WriteLine("[Get] id");
+            var entity = await _table.FindAsync(CastPropertyValue(this.FirstKeyProperty, id));
 
             if (entity == null)
             {
@@ -118,20 +151,20 @@ namespace DotNetCoreReactAdmin.Controllers
             Console.WriteLine("[Post]");
             _table.Add(entity);
             await _context.SaveChangesAsync();
-            var uid = (int)typeof(T).GetProperty("Id").GetValue(entity);
+            var id = typeof(T).GetProperty(this.FirstKeyName).GetValue(entity);
             Response.Headers.Add("Access-Control-Allow-Credentials", "true");
             Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type,Authorization");
             Response.Headers.Add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
             Response.Headers.Add("Access-Control-Allow-Origin", "*");
-            return Ok(await _table.FindAsync(uid));
+            return Ok(await _table.FindAsync(id));
         }
 
-        [HttpPut("{uid}")]
-        public async Task<IActionResult> Put(long uid, T entity)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Put(string id, T entity)
         {
             Console.WriteLine("[Put]");
-            var entityId = (int)typeof(T).GetProperty("Id").GetValue(entity);
-            if (uid != entityId)
+            var entityId = typeof(T).GetProperty(this.FirstKeyName).GetValue(entity);
+            if (CastPropertyValue(this.FirstKeyProperty, id) != entityId)
             {
                 return BadRequest();
             }
@@ -144,7 +177,7 @@ namespace DotNetCoreReactAdmin.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!EntityExists(uid))
+                if (!EntityExists(id))
                 {
                     return NotFound();
                 }
@@ -161,9 +194,54 @@ namespace DotNetCoreReactAdmin.Controllers
             return Ok(await _table.FindAsync(entityId));
         }
 
-        private bool EntityExists(long uid)
+        private bool EntityExists(string id)
         {
-            return _table.Any(e => (int)typeof(T).GetProperty("Id").GetValue(e) == uid);
+            return _table.Any(e => typeof(T).GetProperty(this.FirstKeyName).GetValue(e) == CastPropertyValue(this.FirstKeyProperty, id));
+        }
+
+        // credit to <https://stackoverflow.com/a/12836049/9920172>
+        private IEnumerable<PropertyInfo> GetKeys()
+        {
+            PropertyInfo[] properties = typeof(T).GetProperties();
+
+            foreach (PropertyInfo property in properties)
+            {
+                var attribute = Attribute.GetCustomAttribute(property, typeof(KeyAttribute))
+                    as KeyAttribute;
+
+                if (attribute != null) // This property has a KeyAttribute
+                {
+                    yield return property;
+                }
+            }
+        }
+
+        private PropertyInfo GetFirstKey()
+        {
+            foreach (PropertyInfo property in GetKeys())
+            {
+                return property;
+            }
+            return null;
+        }
+
+        // credit to <https://stackoverflow.com/a/909666/9920172>
+        public object CastPropertyValue(PropertyInfo property, string value)
+        {
+            if (property == null || String.IsNullOrEmpty(value))
+                return null;
+            if (property.PropertyType.IsEnum)
+            {
+                Type enumType = property.PropertyType;
+                if (Enum.IsDefined(enumType, value))
+                    return Enum.Parse(enumType, value);
+            }
+            if (property.PropertyType == typeof(bool))
+                return value == "1" || value == "true" || value == "on" || value == "checked";
+            else if (property.PropertyType == typeof(Uri))
+                return new Uri(Convert.ToString(value));
+            else
+                return Convert.ChangeType(value, property.PropertyType);
         }
 
     }
